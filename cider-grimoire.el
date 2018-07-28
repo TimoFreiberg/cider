@@ -39,16 +39,33 @@
 (declare-function markdown-toggle-fontify-code-blocks-natively "markdown-mode.el")
 
 (defconst cider-grimoire-url "http://conj.io/")
+(defconst cider-clojuredocs-url "http://clojuredocs.org/")
 
 (defconst cider-grimoire-buffer "*cider-grimoire*")
 
+(defcustom cider-online-search-provider 'grimoire
+  "The search engine used by cider-grimoire.
+conj.io and clojuredocs.org are supported."
+  :type '(choice (const :tag "conj.io" grimoire)
+                 (const :tag "clojuredocs.org" clojuredocs))
+  :options (list cider-grimoire-url cider-clojuredocs-url)
+  :group 'cider)
+
 (defun cider-grimoire-replace-special (name)
-  "Convert the dashes in NAME to a grimoire friendly format."
+  "Convert special symbols in NAME to a grimoire friendly format."
   (thread-last name
     (replace-regexp-in-string "\\?" "_QMARK_")
     (replace-regexp-in-string "\\." "_DOT_")
     (replace-regexp-in-string "\\/" "_SLASH_")
     (replace-regexp-in-string "\\(\\`_\\)\\|\\(_\\'\\)" "")))
+
+(defun cider-clojuredocs-replace-special (name)
+  "Convert special symbols in NAME to a clojuredocs friendly format."
+  (thread-last name
+    (replace-regexp-in-string "\\?" "_q")
+    (replace-regexp-in-string "\\(\\.+\\)" "_\\1")
+    (replace-regexp-in-string "\\/" "_fs")
+    (replace-regexp-in-string "\\(_\\'\\)" "")))
 
 (defun cider-grimoire-url (name ns)
   "Generate a grimoire search v0 url from NAME, NS."
@@ -56,12 +73,25 @@
     (when (and name ns)
       (concat base-url  "search/v0/" ns "/" (cider-grimoire-replace-special name) "/"))))
 
+(defun cider-clojuredocs-url (name ns)
+  "Generate a clojuredocs search url from NAME, NS."
+  (let ((base-url cider-clojuredocs-url))
+    (when (and name ns)
+      (concat base-url ns "/" (cider-clojuredocs-replace-special name)))))
+
+(defun cider-search-provider-url (name ns)
+  "Generates a search url for the configured search provider from NAME, NS."
+  (pcase cider-online-search-provider
+    ('grimoire (cider-grimoire-url name ns))
+    ('clojuredocs (cider-clojuredocs-url name ns))
+    (_ (error "Unknown search provider specified"))))
+
 (defun cider-grimoire-web-lookup (symbol)
   "Open the grimoire documentation for SYMBOL in a web browser."
   (if-let* ((var-info (cider-var-info symbol)))
       (let ((name (nrepl-dict-get var-info "name"))
             (ns (nrepl-dict-get var-info "ns")))
-        (browse-url (cider-grimoire-url name ns)))
+        (browse-url (cider-search-provider-url name ns)))
     (error "Symbol %s not resolved" symbol)))
 
 ;;;###autoload
@@ -100,7 +130,7 @@ Grimoire's convention."
             (ns (nrepl-dict-get var-info "ns" "clojure.core"))
             (url-request-method "GET")
             (url-request-extra-headers `(("Content-Type" . "text/plain"))))
-        (url-retrieve (cider-grimoire-url name ns)
+        (url-retrieve (cider-search-provider-url name ns)
                       (lambda (_status)
                         ;; we need to strip the http header
                         (goto-char (point-min))
