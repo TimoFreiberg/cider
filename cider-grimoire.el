@@ -54,18 +54,19 @@ conj.io and clojuredocs.org are supported."
 (defun cider-grimoire-replace-special (name)
   "Convert special symbols in NAME to a grimoire friendly format."
   (thread-last name
-    (replace-regexp-in-string "\\?" "_QMARK_")
-    (replace-regexp-in-string "\\." "_DOT_")
-    (replace-regexp-in-string "\\/" "_SLASH_")
-    (replace-regexp-in-string "\\(\\`_\\)\\|\\(_\\'\\)" "")))
+    (replace-regexp-in-string (rx "?") "_QMARK_")
+    (replace-regexp-in-string (rx ".") "_DOT_")
+    (replace-regexp-in-string "/" "_SLASH_")
+    (replace-regexp-in-string (rx (or (group string-start "_")
+                                      (group "_" string-end))) "")))
 
 (defun cider-clojuredocs-replace-special (name)
   "Convert special symbols in NAME to a clojuredocs friendly format."
   (thread-last name
-    (replace-regexp-in-string "\\?" "_q")
-    (replace-regexp-in-string "\\(\\.+\\)" "_\\1")
-    (replace-regexp-in-string "\\/" "_fs")
-    (replace-regexp-in-string "\\(_\\'\\)" "")))
+    (replace-regexp-in-string (rx "?") "_q")
+    (replace-regexp-in-string (rx (group (1+ "."))) "_\\1")
+    (replace-regexp-in-string (rx "/") "_fs")
+    (replace-regexp-in-string (rx "_" string-end) "")))
 
 (defun cider-grimoire-url (name ns)
   "Generate a grimoire search v0 url from NAME, NS."
@@ -84,7 +85,7 @@ conj.io and clojuredocs.org are supported."
   (pcase cider-online-search-provider
     ('grimoire (cider-grimoire-url name ns))
     ('clojuredocs (cider-clojuredocs-url name ns))
-    (_ (error "Unknown search provider specified"))))
+    (other (error "Unknown search provider specified: %s" other))))
 
 (defun cider-grimoire-web-lookup (symbol)
   "Open the grimoire documentation for SYMBOL in a web browser."
